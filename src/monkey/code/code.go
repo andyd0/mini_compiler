@@ -12,6 +12,7 @@ type Opcode byte
 
 const (
 	OpConstant Opcode = iota
+	OpAdd
 )
 
 // Definition - Name and length of opcode
@@ -23,6 +24,7 @@ type Definition struct {
 // Two bytes wide so max value is 66536
 var definitions = map[Opcode]*Definition{
 	OpConstant: {"OpConstant", []int{2}},
+	OpAdd:      {"OpAdd", []int{}}, // has no operands so empty slice
 }
 
 // Lookup looks up an opcode
