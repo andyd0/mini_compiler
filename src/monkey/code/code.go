@@ -13,6 +13,7 @@ type Opcode byte
 const (
 	OpConstant Opcode = iota
 	OpAdd
+	OpPop
 )
 
 // Definition - Name and length of opcode
@@ -25,6 +26,7 @@ type Definition struct {
 var definitions = map[Opcode]*Definition{
 	OpConstant: {"OpConstant", []int{2}},
 	OpAdd:      {"OpAdd", []int{}}, // has no operands so empty slice
+	OpPop:      {"OpPop", []int{}},
 }
 
 // Lookup looks up an opcode

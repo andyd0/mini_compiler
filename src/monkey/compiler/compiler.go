@@ -38,6 +38,8 @@ func (c *Compiler) Compile(node ast.Node) error {
 		if err != nil {
 			return err
 		}
+		// Cleaning the stack after expression evaluatede
+		c.emit(code.OpPop)
 
 	// This is recursively sending left operand and right
 	// operand to be processed

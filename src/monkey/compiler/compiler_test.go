@@ -19,6 +19,19 @@ func TestIntegerArithmetic(t *testing.T) {
 				code.Make(code.OpConstant, 0),
 				code.Make(code.OpConstant, 1),
 				code.Make(code.OpAdd),
+				// The compiled expression should be followed by an OpPop
+				code.Make(code.OpPop),
+			},
+		},
+		{
+			input:             "1; 2",
+			expectedConstants: []interface{}{1, 2},
+			expectedInstructions: []code.Instructions{
+				code.Make(code.OpConstant, 0),
+				code.Make(code.OpPop),
+				code.Make(code.OpConstant, 1),
+				// The compiled expression should be followed by an OpPop
+				code.Make(code.OpPop),
 			},
 		},
 	}
