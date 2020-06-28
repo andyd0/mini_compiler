@@ -13,12 +13,18 @@ type Opcode byte
 const (
 	OpConstant Opcode = iota
 	OpAdd
-	OpPop
 	OpSub
 	OpMul
 	OpDiv
+
 	OpTrue
 	OpFalse
+
+	OpEqual
+	OpNotEqual
+	OpGreaterThan
+
+	OpPop
 )
 
 // Definition - Name and length of opcode
@@ -34,9 +40,16 @@ var definitions = map[Opcode]*Definition{
 	OpSub:      {"OpSub", []int{}},
 	OpMul:      {"OpMul", []int{}},
 	OpDiv:      {"OpDiv", []int{}},
-	OpTrue:     {"OpTrue", []int{}},
-	OpFalse:    {"OpFalse", []int{}},
-	OpPop:      {"OpPop", []int{}},
+
+	OpTrue:  {"OpTrue", []int{}},
+	OpFalse: {"OpFalse", []int{}},
+
+	OpEqual:    {"OpEqual", []int{}},
+	OpNotEqual: {"OpNotEqual", []int{}},
+	// No less than because the it can be reordered for the same result
+	OpGreaterThan: {"OpGreaterThan", []int{}},
+
+	OpPop: {"OpPop", []int{}},
 }
 
 // Lookup looks up an opcode
