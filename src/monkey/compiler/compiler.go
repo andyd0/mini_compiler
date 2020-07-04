@@ -7,12 +7,12 @@ import (
 	"monkey/object"
 )
 
-// Compiler - instructions will hold the generated
 type EmittedInstruction struct {
 	Opcode   code.Opcode
 	Position int
 }
 
+// Compiler - instructions will hold the generated
 // bytecode and constants is a slice that serves as
 // the constant pool
 type Compiler struct {
