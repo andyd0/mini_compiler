@@ -8,6 +8,7 @@ import (
 )
 
 const StackSize = 2048
+const GlobalSize = 65536
 
 // immutable / unique values so reusing global instances
 var True = &object.Boolean{Value: true}
@@ -23,6 +24,8 @@ type VM struct {
 	// Always points to the next value. Top of stack is stack[sp-1]
 	// allows for shrinking / growing the stack without modifying
 	sp int
+
+	globals []object.Object
 }
 
 func New(bytecode *compiler.Bytecode) *VM {
@@ -32,6 +35,10 @@ func New(bytecode *compiler.Bytecode) *VM {
 
 		stack: make([]object.Object, StackSize),
 		sp:    0,
+
+		// Use a slice because it gives direct index-based access without
+		// additional overhead
+		globals: make([]object.Object, GlobalSize),
 	}
 }
 
@@ -125,6 +132,21 @@ func (vm *VM) Run() error {
 		case code.OpPop:
 			vm.pop()
 
+		case code.OpSetGlobal:
+			globalIndex := code.ReadUint16(vm.instructions[ip+1:])
+			ip += 2
+			// value that should be bound to a name and save it to the
+			// globals store
+			vm.globals[globalIndex] = vm.pop()
+
+		case code.OpGetGlobal:
+			globalIndex := code.ReadUint16(vm.instructions[ip+1:])
+			ip += 2
+
+			err := vm.push(vm.globals[globalIndex])
+			if err != nil {
+				return err
+			}
 		}
 
 	}
@@ -272,4 +294,11 @@ func isTruthy(obj object.Object) bool {
 	default:
 		return true
 	}
+}
+
+// NewWithGlobalsStore ensures GlobalStore is maintained in a REPL session
+func NewWithGlobalsStore(bytecode *compiler.Bytecode, s []object.Object) *VM {
+	vm := New(bytecode)
+	vm.globals = s
+	return vm
 }
