@@ -89,24 +89,21 @@ func (c *Compiler) Compile(node ast.Node) error {
 			c.removeLastPop()
 		}
 
+		// still using a bogus value. jumping over the else
+		// branch if the condition was truthy. like before, saving
+		// position to come back to it later to update operand
+		jumpPos := c.emit(code.OpJump, 9999)
+
 		// the offset of the next-to-be-emitted instruction which
 		// is where to jump to in case the Consequence of the conditional
 		// isn't executed because the value of at the top of the stack
 		// is not truthy
+		afterConsequencePos := len(c.instructions)
+		c.changeOperand(jumpNotTruthyPos, afterConsequencePos)
+
 		if node.Alternative == nil {
-			afterConsequencePos := len(c.instructions)
-			c.changeOperand(jumpNotTruthyPos, afterConsequencePos)
+			c.emit(code.OpNull)
 		} else {
-			// still using a bogus value. jumping over the else
-			// branch if the condition was truthy. like before, saving
-			// position to come back to it later to update operand
-			jumpPos := c.emit(code.OpJump, 9999)
-
-			// patching the previously emitted OpJumpNotTruthy instruction
-			// making it jump right after the just emitted OpJump
-			afterConsequencePos := len(c.instructions)
-			c.changeOperand(jumpNotTruthyPos, afterConsequencePos)
-
 			err = c.Compile(node.Alternative)
 			if err != nil {
 				return err
@@ -115,12 +112,12 @@ func (c *Compiler) Compile(node ast.Node) error {
 			if c.lastInstructionIsPop() {
 				c.removeLastPop()
 			}
-
-			// To the offset of the next-to-be emitted instruction which
-			// is right after the alternative
-			afterAlternativePos := len(c.instructions)
-			c.changeOperand(jumpPos, afterAlternativePos)
 		}
+
+		// To the offset of the next-to-be emitted instruction which
+		// is right after the alternative
+		afterAlternativePos := len(c.instructions)
+		c.changeOperand(jumpPos, afterAlternativePos)
 
 	// This is recursively sending left operand and right
 	// operand to be processed
