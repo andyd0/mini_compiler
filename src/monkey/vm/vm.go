@@ -147,6 +147,23 @@ func (vm *VM) Run() error {
 			if err != nil {
 				return err
 			}
+
+		case code.OpArray:
+			numElements := int(code.ReadUint16(vm.instructions[ip+1:]))
+			ip += 2
+
+			// letting buildArray know where the array elements are on
+			// the stack
+			array := vm.buildArray(vm.sp-numElements, vm.sp)
+			// removes the elements from the stack that are now in the array
+			vm.sp = vm.sp - numElements
+
+			// push the stack onto the stack
+			err := vm.push(array)
+			if err != nil {
+				return err
+			}
+
 		}
 
 	}
@@ -209,6 +226,13 @@ func (vm *VM) executeBinaryStringOperation(
 	rightValue := right.(*object.String).Value
 
 	return vm.push(&object.String{Value: leftValue + rightValue})
+}
+
+func nativeBoolToBooleanObject(input bool) *object.Boolean {
+	if input {
+		return True
+	}
+	return False
 }
 
 func (vm *VM) executeComparison(op code.Opcode) error {
@@ -276,13 +300,6 @@ func (vm *VM) executeMinusOperator() error {
 	return vm.push(&object.Integer{Value: -value})
 }
 
-func nativeBoolToBooleanObject(input bool) *object.Boolean {
-	if input {
-		return True
-	}
-	return False
-}
-
 func (vm *VM) push(o object.Object) error {
 	if vm.sp >= StackSize {
 		return fmt.Errorf("stack overflow")
@@ -298,6 +315,18 @@ func (vm *VM) pop() object.Object {
 	o := vm.stack[vm.sp-1]
 	vm.sp--
 	return o
+}
+
+// iterates through the elements of the array on the stack and
+// adds them to a newly built *object.Array
+func (vm *VM) buildArray(startIndex, endIndex int) object.Object {
+	elements := make([]object.Object, endIndex-startIndex)
+
+	for i := startIndex; i < endIndex; i++ {
+		elements[i-startIndex] = vm.stack[i]
+	}
+
+	return &object.Array{Elements: elements}
 }
 
 func isTruthy(obj object.Object) bool {

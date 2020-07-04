@@ -35,6 +35,8 @@ const (
 
 	OpSetGlobal
 	OpGetGlobal
+
+	OpArray
 )
 
 // Definition - Name and length of opcode
@@ -70,6 +72,8 @@ var definitions = map[Opcode]*Definition{
 
 	OpSetGlobal: {"OpSetGlobal", []int{2}},
 	OpGetGlobal: {"OpGetGlobal", []int{2}},
+
+	OpArray: {"OpArray", []int{2}},
 }
 
 // Lookup looks up an opcode
