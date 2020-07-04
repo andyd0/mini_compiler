@@ -28,6 +28,9 @@ const (
 	OpBang
 
 	OpPop
+
+	OpJumpNotTruthy
+	OpJump
 )
 
 // Definition - Name and length of opcode
@@ -56,6 +59,9 @@ var definitions = map[Opcode]*Definition{
 	OpBang:  {"OpBang", []int{}},
 
 	OpPop: {"OpPop", []int{}},
+
+	OpJumpNotTruthy: {"OpJumpNotTruthy", []int{2}},
+	OpJump:          {"OpJump", []int{2}},
 }
 
 // Lookup looks up an opcode

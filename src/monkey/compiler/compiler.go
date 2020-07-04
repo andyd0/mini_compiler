@@ -8,17 +8,35 @@ import (
 )
 
 // Compiler - instructions will hold the generated
+type EmittedInstruction struct {
+	Opcode   code.Opcode
+	Position int
+}
+
 // bytecode and constants is a slice that serves as
 // the constant pool
 type Compiler struct {
 	instructions code.Instructions
 	constants    []object.Object
+
+	lastInstruction     EmittedInstruction
+	previousInstruction EmittedInstruction
+}
+
+// Bytecode contains the Instructions the compiler
+// generated and the Constants the compiler evaluated
+// This is what will be passed to the VM
+type Bytecode struct {
+	Instructions code.Instructions
+	Constants    []object.Object
 }
 
 func New() *Compiler {
 	return &Compiler{
-		instructions: code.Instructions{},
-		constants:    []object.Object{},
+		instructions:        code.Instructions{},
+		constants:           []object.Object{},
+		lastInstruction:     EmittedInstruction{},
+		previousInstruction: EmittedInstruction{},
 	}
 }
 
@@ -40,6 +58,69 @@ func (c *Compiler) Compile(node ast.Node) error {
 		}
 		// Cleaning the stack after expression evaluatede
 		c.emit(code.OpPop)
+
+	case *ast.BlockStatement:
+		for _, s := range node.Statements {
+			err := c.Compile(s)
+			if err != nil {
+				return err
+			}
+		}
+
+	case *ast.IfExpression:
+		err := c.Compile(node.Condition)
+		if err != nil {
+			return err
+		}
+
+		// arbitrary number given that will be replaced
+		// when Consequence gets compiled and correct offset is then
+		// known - called back-patching where AST is traversed once
+		// position to replace the OpPop that gets added by Consequence
+		jumpNotTruthyPos := c.emit(code.OpJumpNotTruthy, 9999)
+
+		// an expression statement / the expression after condition
+		err = c.Compile(node.Consequence)
+		if err != nil {
+			return err
+		}
+
+		if c.lastInstructionIsPop() {
+			c.removeLastPop()
+		}
+
+		// the offset of the next-to-be-emitted instruction which
+		// is where to jump to in case the Consequence of the conditional
+		// isn't executed because the value of at the top of the stack
+		// is not truthy
+		if node.Alternative == nil {
+			afterConsequencePos := len(c.instructions)
+			c.changeOperand(jumpNotTruthyPos, afterConsequencePos)
+		} else {
+			// still using a bogus value. jumping over the else
+			// branch if the condition was truthy. like before, saving
+			// position to come back to it later to update operand
+			jumpPos := c.emit(code.OpJump, 9999)
+
+			// patching the previously emitted OpJumpNotTruthy instruction
+			// making it jump right after the just emitted OpJump
+			afterConsequencePos := len(c.instructions)
+			c.changeOperand(jumpNotTruthyPos, afterConsequencePos)
+
+			err = c.Compile(node.Alternative)
+			if err != nil {
+				return err
+			}
+
+			if c.lastInstructionIsPop() {
+				c.removeLastPop()
+			}
+
+			// To the offset of the next-to-be emitted instruction which
+			// is right after the alternative
+			afterAlternativePos := len(c.instructions)
+			c.changeOperand(jumpPos, afterAlternativePos)
+		}
 
 	// This is recursively sending left operand and right
 	// operand to be processed
@@ -125,10 +206,28 @@ func (c *Compiler) addConstant(obj object.Object) int {
 	return len(c.constants) - 1
 }
 
+func (c *Compiler) Bytecode() *Bytecode {
+	return &Bytecode{
+		Instructions: c.instructions,
+		Constants:    c.constants,
+	}
+}
+
+func (c *Compiler) setLastInstruction(op code.Opcode, pos int) {
+	previous := c.lastInstruction
+	last := EmittedInstruction{Opcode: op, Position: pos}
+
+	c.previousInstruction = previous
+	c.lastInstruction = last
+}
+
 // Returns the starting position of the just emitted instruction
 func (c *Compiler) emit(op code.Opcode, operands ...int) int {
 	ins := code.Make(op, operands...)
 	pos := c.addInstruction(ins)
+
+	c.setLastInstruction(op, pos)
+
 	return pos
 }
 
@@ -139,17 +238,30 @@ func (c *Compiler) addInstruction(ins []byte) int {
 	return posNewInstruction
 }
 
-func (c *Compiler) Bytecode() *Bytecode {
-	return &Bytecode{
-		Instructions: c.instructions,
-		Constants:    c.constants,
+func (c *Compiler) lastInstructionIsPop() bool {
+	return c.lastInstruction.Opcode == code.OpPop
+}
+
+// Reason for keeping track of last / previous was to be able
+// to remove the OpPop on the stack that gets added by the Consequene
+func (c *Compiler) removeLastPop() {
+	c.instructions = c.instructions[:c.lastInstruction.Position]
+	c.lastInstruction = c.previousInstruction
+}
+
+// Replaces instructions of the same type only
+func (c *Compiler) replaceInstruction(pos int, newInstruction []byte) {
+	for i := 0; i < len(newInstruction); i++ {
+		c.instructions[pos+i] = newInstruction[i]
 	}
 }
 
-// Bytecode contains the Instructions the compiler
-// generated and the Constants the compiler evaluated
-// This is what will be passed to the VM
-type Bytecode struct {
-	Instructions code.Instructions
-	Constants    []object.Object
+// ChangeOperand doesn't actually change the operand but
+// actually replaces the instruction with the necessary
+// operand
+func (c *Compiler) changeOperand(opPos int, operand int) {
+	op := code.Opcode(c.instructions[opPos])
+	newInstruction := code.Make(op, operand)
+
+	c.replaceInstruction(opPos, newInstruction)
 }
