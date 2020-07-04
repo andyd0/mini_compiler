@@ -32,6 +32,9 @@ const (
 
 	OpJumpNotTruthy
 	OpJump
+
+	OpSetGlobal
+	OpGetGlobal
 )
 
 // Definition - Name and length of opcode
@@ -64,6 +67,9 @@ var definitions = map[Opcode]*Definition{
 
 	OpJumpNotTruthy: {"OpJumpNotTruthy", []int{2}},
 	OpJump:          {"OpJump", []int{2}},
+
+	OpSetGlobal: {"OpSetGlobal", []int{2}},
+	OpGetGlobal: {"OpGetGlobal", []int{2}},
 }
 
 // Lookup looks up an opcode
