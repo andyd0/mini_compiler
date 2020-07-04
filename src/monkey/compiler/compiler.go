@@ -21,6 +21,8 @@ type Compiler struct {
 
 	lastInstruction     EmittedInstruction
 	previousInstruction EmittedInstruction
+
+	symbolTable *SymbolTable
 }
 
 // Bytecode contains the Instructions the compiler
@@ -37,6 +39,7 @@ func New() *Compiler {
 		constants:           []object.Object{},
 		lastInstruction:     EmittedInstruction{},
 		previousInstruction: EmittedInstruction{},
+		symbolTable:         NewSymbolTable(),
 	}
 }
 
@@ -67,11 +70,27 @@ func (c *Compiler) Compile(node ast.Node) error {
 			}
 		}
 
+	// leads to a compile time error even though looks like any
+	// other map access
+	case *ast.Identifier:
+		symbol, ok := c.symbolTable.Resolve(node.Value)
+		if !ok {
+			return fmt.Errorf("undefined variable %s", node.Value)
+		}
+
+		c.emit(code.OpGetGlobal, symbol.Index)
+
 	case *ast.LetStatement:
 		err := c.Compile(node.Value)
 		if err != nil {
 			return err
 		}
+		// Name being the *ast.Indetifier on the left side
+		// of the let statement and Value holds the string
+		// representation of the identifier. With this an,
+		// index is created
+		symbol := c.symbolTable.Define(node.Name.Value)
+		c.emit(code.OpSetGlobal, symbol.Index)
 
 	case *ast.IfExpression:
 		err := c.Compile(node.Condition)
