@@ -38,6 +38,7 @@ const (
 
 	OpArray
 	OpHash
+	OpIndex
 )
 
 // Definition - Name and length of opcode
@@ -76,6 +77,7 @@ var definitions = map[Opcode]*Definition{
 
 	OpArray: {"OpArray", []int{2}},
 	OpHash:  {"OpHash", []int{2}},
+	OpIndex: {"OpIndex", []int{}},
 }
 
 // Lookup looks up an opcode
