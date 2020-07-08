@@ -37,6 +37,8 @@ type Bytecode struct {
 // emitted instructions for the body of a function.
 // used to eventually compile a function. after that,
 // instructions are put int a CompiledFunction
+// this is to avoid instructions being entangled with
+// the main program
 type CompilationScope struct {
 	instructions        code.Instructions
 	lastInstruction     EmittedInstruction
@@ -125,7 +127,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 			return err
 		}
 
-		if c.lastInstructionIsPop() {
+		if c.lastInstructionIs(code.OpPop) {
 			c.removeLastPop()
 		}
 
@@ -149,7 +151,7 @@ func (c *Compiler) Compile(node ast.Node) error {
 				return err
 			}
 
-			if c.lastInstructionIsPop() {
+			if c.lastInstructionIs(code.OpPop) {
 				c.removeLastPop()
 			}
 		}
@@ -250,6 +252,44 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 		c.emit(code.OpArray, len(node.Elements))
 
+	// 1. enter a new scope
+	// 2. compile the nodes that make up the function's body
+	// 3. take instructions off the stack of CompilationScope by
+	// calling c.leaveScope()
+	// 4. Create a CompiledFunction that holds these instructions
+	// 5. add the function to the constant pool
+	case *ast.FunctionLiteral:
+		c.enterScope()
+
+		err := c.Compile(node.Body)
+		if err != nil {
+			return err
+		}
+
+		// turns every last statement into an OpReturnValue
+		if c.lastInstructionIs(code.OpPop) {
+			c.replaceLastPopWithReturn()
+		}
+		// otherwise, there was error no statements in the
+		// function's body or only statements that couldn't
+		// be turned into an OpReturnValue
+		if !c.lastInstructionIs(code.OpReturnValue) {
+			c.emit(code.OpReturn)
+		}
+
+		instructions := c.leaveScope()
+
+		compiledFn := &object.CompiledFunction{Instructions: instructions}
+		c.emit(code.OpConstant, c.addConstant(compiledFn))
+
+	case *ast.ReturnStatement:
+		err := c.Compile(node.ReturnValue)
+		if err != nil {
+			return err
+		}
+
+		c.emit(code.OpReturnValue)
+
 	case *ast.HashLiteral:
 		keys := []ast.Expression{}
 		// node.Pairs -> map[ast.Expression]ast.Expression
@@ -336,8 +376,12 @@ func (c *Compiler) addInstruction(ins []byte) int {
 	return posNewInstruction
 }
 
-func (c *Compiler) lastInstructionIsPop() bool {
-	return c.scopes[c.scopeIndex].lastInstruction.Opcode == code.OpPop
+func (c *Compiler) lastInstructionIs(op code.Opcode) bool {
+	if len(c.currentInstructions()) == 0 {
+		return false
+	}
+
+	return c.scopes[c.scopeIndex].lastInstruction.Opcode == op
 }
 
 // to remove the OpPop on the stack that gets added by the Consequene
@@ -392,6 +436,13 @@ func (c *Compiler) leaveScope() code.Instructions {
 	c.scopeIndex--
 
 	return instructions
+}
+
+func (c *Compiler) replaceLastPopWithReturn() {
+	lastPos := c.scopes[c.scopeIndex].lastInstruction.Position
+	c.replaceInstruction(lastPos, code.Make(code.OpReturnValue))
+
+	c.scopes[c.scopeIndex].lastInstruction.Opcode = code.OpReturnValue
 }
 
 func NewWithState(s *SymbolTable, constants []object.Object) *Compiler {

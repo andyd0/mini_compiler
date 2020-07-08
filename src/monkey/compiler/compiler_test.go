@@ -387,6 +387,27 @@ func TestHashLiterals(t *testing.T) {
 	runCompilerTests(t, tests)
 }
 
+func TestFunctionsWithoutReturnValue(t *testing.T) {
+	// empty function body should just be a single OpReturn
+	// instruction
+	tests := []compilerTestCase{
+		{
+			input: `fn() { }`,
+			expectedConstants: []interface{}{
+				[]code.Instructions{
+					code.Make(code.OpReturn),
+				},
+			},
+			expectedInstructions: []code.Instructions{
+				code.Make(code.OpConstant, 0),
+				code.Make(code.OpPop),
+			},
+		},
+	}
+
+	runCompilerTests(t, tests)
+}
+
 // Don't have to worry about testing for empty arrays
 // or non existent indexes here because the compiler
 // doesn't care what is being indexed or what operation
@@ -438,6 +459,40 @@ func TestFunctions(t *testing.T) {
 					code.Make(code.OpConstant, 0),
 					code.Make(code.OpConstant, 1),
 					code.Make(code.OpAdd),
+					code.Make(code.OpReturnValue),
+				},
+			},
+			expectedInstructions: []code.Instructions{
+				code.Make(code.OpConstant, 2),
+				code.Make(code.OpPop),
+			},
+		},
+		{
+			input: `fn() { 5 + 10 }`,
+			expectedConstants: []interface{}{
+				5,
+				10,
+				[]code.Instructions{
+					code.Make(code.OpConstant, 0),
+					code.Make(code.OpConstant, 1),
+					code.Make(code.OpAdd),
+					code.Make(code.OpReturnValue),
+				},
+			},
+			expectedInstructions: []code.Instructions{
+				code.Make(code.OpConstant, 2),
+				code.Make(code.OpPop),
+			},
+		},
+		{
+			input: `fn() { 1; 2 }`,
+			expectedConstants: []interface{}{
+				1,
+				2,
+				[]code.Instructions{
+					code.Make(code.OpConstant, 0),
+					code.Make(code.OpPop),
+					code.Make(code.OpConstant, 1),
 					code.Make(code.OpReturnValue),
 				},
 			},
