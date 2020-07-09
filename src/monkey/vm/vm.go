@@ -241,6 +241,16 @@ func (vm *VM) Run() error {
 				return err
 			}
 
+		// Handling the case when the function's return value is Null
+		case code.OpReturn:
+			vm.popFrame()
+			vm.pop()
+
+			err := vm.push(Null)
+			if err != nil {
+				return err
+			}
+
 		}
 	}
 
