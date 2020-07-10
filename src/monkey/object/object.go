@@ -33,9 +33,11 @@ const (
 )
 
 // Holds the instructions from the compilation of a function
-// literal
+// literal. NumLocals will let the app know how many locals
+// a function is going to use
 type CompiledFunction struct {
 	Instructions code.Instructions
+	NumLocals    int
 }
 
 type HashKey struct {
