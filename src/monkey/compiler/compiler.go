@@ -109,16 +109,22 @@ func (c *Compiler) Compile(node ast.Node) error {
 		c.loadSymbol(symbol)
 
 	case *ast.LetStatement:
-		err := c.Compile(node.Value)
-		if err != nil {
-			return err
-		}
 		// Name being the *ast.Indetifier on the left side
 		// of the let statement and Value holds the string
 		// representation of the identifier. By passing it to
 		// to the Define method, this is also giving the symbol
 		// it's scope and index
+		// also, by defining symbol here instead of right before
+		// scope check it enabled recursion with a function
+		// like the fibonacci test -> it defines the name to which
+		// a function will be bound right before the boddy is compiled
+		// allowing the function's body to reference the name of the function
 		symbol := c.symbolTable.Define(node.Name.Value)
+		err := c.Compile(node.Value)
+		if err != nil {
+			return err
+		}
+
 		if symbol.Scope == GlobalScope {
 			c.emit(code.OpSetGlobal, symbol.Index)
 		} else {

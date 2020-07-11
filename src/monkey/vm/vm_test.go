@@ -31,7 +31,7 @@ func TestIntegerArithmetic(t *testing.T) {
 		{"(5 + 10 * 2 + 15 / 3) * 2 + -10", 50},
 	}
 
-	runVMTests(t, tests)
+	runVmTests(t, tests)
 }
 
 func TestStringExpressions(t *testing.T) {
@@ -41,7 +41,7 @@ func TestStringExpressions(t *testing.T) {
 		{`"mon" + "key" + "banana"`, "monkeybanana"},
 	}
 
-	runVMTests(t, tests)
+	runVmTests(t, tests)
 }
 
 func TestBooleanExpressions(t *testing.T) {
@@ -74,7 +74,7 @@ func TestBooleanExpressions(t *testing.T) {
 		{"!(if (false) { 5; })", true},
 	}
 
-	runVMTests(t, tests)
+	runVmTests(t, tests)
 }
 
 func TestConditionals(t *testing.T) {
@@ -91,7 +91,7 @@ func TestConditionals(t *testing.T) {
 		{"if ((if (false) { 10 })) { 10 } else { 20 }", 20},
 	}
 
-	runVMTests(t, tests)
+	runVmTests(t, tests)
 }
 
 func TestGlobalLetStatements(t *testing.T) {
@@ -101,7 +101,7 @@ func TestGlobalLetStatements(t *testing.T) {
 		{"let one = 1; let two = one + one; one + two", 3},
 	}
 
-	runVMTests(t, tests)
+	runVmTests(t, tests)
 }
 
 func TestArrayLiterals(t *testing.T) {
@@ -111,7 +111,7 @@ func TestArrayLiterals(t *testing.T) {
 		{"[1 + 2, 3 * 4, 5 + 6]", []int{3, 12, 11}},
 	}
 
-	runVMTests(t, tests)
+	runVmTests(t, tests)
 }
 
 func TestHashLiterals(t *testing.T) {
@@ -135,7 +135,7 @@ func TestHashLiterals(t *testing.T) {
 		},
 	}
 
-	runVMTests(t, tests)
+	runVmTests(t, tests)
 }
 
 func TestIndexExpressions(t *testing.T) {
@@ -152,7 +152,7 @@ func TestIndexExpressions(t *testing.T) {
 		{"{}[0]", Null},
 	}
 
-	runVMTests(t, tests)
+	runVmTests(t, tests)
 }
 
 func TestCallingFunctionsWithoutArguments(t *testing.T) {
@@ -183,7 +183,7 @@ func TestCallingFunctionsWithoutArguments(t *testing.T) {
 		},
 	}
 
-	runVMTests(t, tests)
+	runVmTests(t, tests)
 }
 
 func TestFunctionsWithReturnStatement(t *testing.T) {
@@ -204,7 +204,7 @@ func TestFunctionsWithReturnStatement(t *testing.T) {
 		},
 	}
 
-	runVMTests(t, tests)
+	runVmTests(t, tests)
 }
 
 func TestFunctionsWithoutReturnValue(t *testing.T) {
@@ -227,7 +227,7 @@ func TestFunctionsWithoutReturnValue(t *testing.T) {
 		},
 	}
 
-	runVMTests(t, tests)
+	runVmTests(t, tests)
 }
 
 func TestFirstClassFunctions(t *testing.T) {
@@ -252,7 +252,7 @@ func TestFirstClassFunctions(t *testing.T) {
 		},
 	}
 
-	runVMTests(t, tests)
+	runVmTests(t, tests)
 }
 
 func TestCallingFunctionsWithBindings(t *testing.T) {
@@ -304,7 +304,7 @@ func TestCallingFunctionsWithBindings(t *testing.T) {
 		},
 	}
 
-	runVMTests(t, tests)
+	runVmTests(t, tests)
 }
 
 func TestCallingFunctionsWithArgumentsAndBindings(t *testing.T) {
@@ -364,7 +364,7 @@ func TestCallingFunctionsWithArgumentsAndBindings(t *testing.T) {
 		},
 	}
 
-	runVMTests(t, tests)
+	runVmTests(t, tests)
 }
 
 func TestCallingFunctionsWithWrongArguments(t *testing.T) {
@@ -447,7 +447,7 @@ func TestBuiltinFunctions(t *testing.T) {
 		},
 	}
 
-	runVMTests(t, tests)
+	runVmTests(t, tests)
 }
 
 func TestClosures(t *testing.T) {
@@ -526,7 +526,31 @@ func TestClosures(t *testing.T) {
 		},
 	}
 
-	runVMTests(t, tests)
+	runVmTests(t, tests)
+}
+
+func TestRecursiveFibonacci(t *testing.T) {
+	tests := []vmTestCase{
+		{
+			input: `
+		let fibonacci = fn(x) {
+			if (x == 0) {
+				return 0;
+			} else {
+				if (x == 1) {
+					return 1;
+				} else {
+					fibonacci(x - 1) + fibonacci(x - 2);
+				}
+			}
+		};
+		fibonacci(15);
+		`,
+			expected: 610,
+		},
+	}
+
+	runVmTests(t, tests)
 }
 
 func testExpectedObject(
@@ -670,7 +694,7 @@ type vmTestCase struct {
 	expected interface{}
 }
 
-func runVMTests(t *testing.T, tests []vmTestCase) {
+func runVmTests(t *testing.T, tests []vmTestCase) {
 	t.Helper()
 
 	for _, tt := range tests {
