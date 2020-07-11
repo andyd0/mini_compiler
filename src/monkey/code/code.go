@@ -46,6 +46,9 @@ const (
 	OpReturn
 	OpReturnValue
 
+	OpClosure
+	OpGetFree
+
 	OpGetBuiltin
 )
 
@@ -94,6 +97,15 @@ var definitions = map[Opcode]*Definition{
 	OpCall:        {"OpCall", []int{1}},
 	OpReturn:      {"OpReturn", []int{}},
 	OpReturnValue: {"OpReturnValue", []int{}},
+
+	// First operand 2 is the constant index. It specifies
+	// where in the constant pool the *object.CompiledFunction
+	// that's to be convereted into a closure. The second operand
+	// 1 specifies how many free variables sit on the stack and
+	// need to be transfered to the about-to-be-created closure.
+	// 1 byte because 256 free variables sould be enough.
+	OpClosure: {"OpClosure", []int{2, 1}},
+	OpGetFree: {"OpGetFree", []int{1}},
 
 	OpGetBuiltin: {"OpGetBuiltin", []int{1}},
 }
@@ -203,6 +215,8 @@ func (ins Instructions) fmtInstruction(def *Definition, operands []int) string {
 		return def.Name
 	case 1:
 		return fmt.Sprintf("%s %d", def.Name, operands[0])
+	case 2:
+		return fmt.Sprintf("%s %d %d", def.Name, operands[0], operands[1])
 	}
 
 	return fmt.Sprintf("ERROR: unhandled operandCount for %s\n", def.Name)

@@ -268,6 +268,9 @@ func (c *Compiler) Compile(node ast.Node) error {
 
 		c.emit(code.OpArray, len(node.Elements))
 
+	// Converts a FunctionLiteral into an object.Object -
+	// meaning something that can be passed around, called
+	// and executed
 	// 1. enter a new scope
 	// 2. compile the nodes that make up the function's body
 	// 3. take instructions off the stack of CompilationScope by
@@ -299,19 +302,31 @@ func (c *Compiler) Compile(node ast.Node) error {
 			c.emit(code.OpReturn)
 		}
 
-		// Before leaving scope, get the current symbol
+		// before leaving scope, get the current symbol
 		// table's numDefinitions which gives the number
 		// of local bindings a function is going to create
-		// and use in the VM
+		// and use in the VM. also get free symbols
+		freeSymbols := c.symbolTable.FreeSymbols
 		numLocals := c.symbolTable.numDefinitions
 		instructions := c.leaveScope()
+
+		// free variables will sit on the stack after this
+		// waiting to be merged with an *object.CompiledFunction
+		// into an *object.Closure
+		for _, s := range freeSymbols {
+			c.loadSymbol(s)
+		}
 
 		compiledFn := &object.CompiledFunction{
 			Instructions:  instructions,
 			NumLocals:     numLocals,
 			NumParameters: len(node.Parameters),
 		}
-		c.emit(code.OpConstant, c.addConstant(compiledFn))
+
+		// instead of OpConstant emit OpClosure to support
+		// closures
+		fnIndex := c.addConstant(compiledFn)
+		c.emit(code.OpClosure, fnIndex, len(freeSymbols))
 
 	case *ast.ReturnStatement:
 		err := c.Compile(node.ReturnValue)
@@ -518,5 +533,7 @@ func (c *Compiler) loadSymbol(s Symbol) {
 		c.emit(code.OpGetLocal, s.Index)
 	case BuiltinScope:
 		c.emit(code.OpGetBuiltin, s.Index)
+	case FreeScope:
+		c.emit(code.OpGetFree, s.Index)
 	}
 }

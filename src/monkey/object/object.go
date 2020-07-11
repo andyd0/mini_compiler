@@ -30,6 +30,7 @@ const (
 	HASH_OBJ  = "HASH"
 
 	COMPILED_FUNCTION_OBJ = "COMPILED_FUNCTION_OBJ"
+	CLOSURE_OBJ           = "CLOSURE"
 )
 
 // Holds the instructions from the compilation of a function
@@ -39,6 +40,13 @@ type CompiledFunction struct {
 	Instructions  code.Instructions
 	NumLocals     int
 	NumParameters int
+}
+
+// Fre - slice of free variables. Like Env that was added
+// to the *object.Functoin in previous book
+type Closure struct {
+	Fn   *CompiledFunction
+	Free []Object
 }
 
 type HashKey struct {
@@ -196,4 +204,9 @@ func (h *Hash) Inspect() string {
 func (cf *CompiledFunction) Type() ObjectType { return COMPILED_FUNCTION_OBJ }
 func (cf *CompiledFunction) Inspect() string {
 	return fmt.Sprintf("CompiledFunction[%p]", cf)
+}
+
+func (c *Closure) Type() ObjectType { return CLOSURE_OBJ }
+func (c *Closure) Inspect() string {
+	return fmt.Sprintf("Closure[%p]", c)
 }

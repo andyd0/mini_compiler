@@ -14,15 +14,18 @@ import (
 // is usually the name given to this pointer that points
 // to the bottom of the stack of the current call frame.
 // it is also called frame pointer
+// first line was a reference to a compiled function but
+// changed to closure to provide support for closures as
+// every function is being treated as a closure.
 type Frame struct {
-	fn          *object.CompiledFunction
+	cl          *object.Closure
 	ip          int
 	basePointer int
 }
 
-func NewFrame(fn *object.CompiledFunction, basePointer int) *Frame {
+func NewFrame(cl *object.Closure, basePointer int) *Frame {
 	f := &Frame{
-		fn:          fn,
+		cl:          cl,
 		ip:          -1,
 		basePointer: basePointer,
 	}
@@ -30,6 +33,11 @@ func NewFrame(fn *object.CompiledFunction, basePointer int) *Frame {
 	return f
 }
 
+// Because of the indirection, instead of going through
+// fn that holds an *object.CompiledFunction now has a cl
+// field pointing to an *object.Closure. To get the instructions
+// go through cl field first and then through the Fn the
+// closure is wrapping.
 func (f *Frame) Instructions() code.Instructions {
-	return f.fn.Instructions
+	return f.cl.Fn.Instructions
 }

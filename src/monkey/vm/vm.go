@@ -35,7 +35,9 @@ func New(bytecode *compiler.Bytecode) *VM {
 	// this is the main frame that contains the bytecode.Instructions that
 	// make up the whole program
 	mainFn := &object.CompiledFunction{Instructions: bytecode.Instructions}
-	mainFrame := NewFrame(mainFn, 0)
+	// to treat every function as a closure to provide support for closures
+	mainClosure := &object.Closure{Fn: mainFn}
+	mainFrame := NewFrame(mainClosure, 0)
 
 	frames := make([]*Frame, MaxFrames)
 	frames[0] = mainFrame
@@ -246,6 +248,29 @@ func (vm *VM) Run() error {
 
 			// checks to see if user defined or built-in
 			err := vm.executeCall(int(numArgs))
+			if err != nil {
+				return err
+			}
+
+		case code.OpClosure:
+			constIndex := code.ReadUint16(ins[ip+1:])
+			numFree := code.ReadUint8(ins[ip+3:])
+			vm.currentFrame().ip += 3
+
+			// the first operand is usde to find the specified function in
+			// the constants and it's turned into an *object.Closure to be
+			// put on the stack
+			err := vm.pushClosure(int(constIndex), int(numFree))
+			if err != nil {
+				return err
+			}
+
+		case code.OpGetFree:
+			freeIndex := code.ReadUint8(ins[ip+1:])
+			vm.currentFrame().ip += 1
+
+			currentClosure := vm.currentFrame().cl
+			err := vm.push(currentClosure.Free[freeIndex])
 			if err != nil {
 				return err
 			}
@@ -536,26 +561,26 @@ func isTruthy(obj object.Object) bool {
 	}
 }
 
-func (vm *VM) callFunction(fn *object.CompiledFunction, numArgs int) error {
+func (vm *VM) callClosure(cl *object.Closure, numArgs int) error {
 	// handle the case where the wrong number of arguments are passed
 	// in. number of parameters defined in object definition
-	if numArgs != fn.NumParameters {
+	if numArgs != cl.Fn.NumParameters {
 		return fmt.Errorf("wrong number of arguments: want=%d, got=%d",
-			fn.NumParameters, numArgs)
+			cl.Fn.NumParameters, numArgs)
 	}
 
 	// if it is a CompiledFunction, crate a new frame that
 	// contains a reference to this function and push it onto
 	// the frames stack. vm.sp serves as the base pointer for
 	// for the new frame
-	frame := NewFrame(fn, vm.sp-numArgs)
+	frame := NewFrame(cl, vm.sp-numArgs)
 	vm.pushFrame(frame)
 
 	// allocating space on the stack for the expected number
 	// of locals by increasing the value of vm.sp. the region
 	// will be used for local bindings and the normal usage
 	// of the function call stack won't affect it
-	vm.sp = frame.basePointer + fn.NumLocals
+	vm.sp = frame.basePointer + cl.Fn.NumLocals
 
 	return nil
 }
@@ -581,18 +606,40 @@ func (vm *VM) callBuiltin(builtin *object.Builtin, numArgs int) error {
 
 func (vm *VM) executeCall(numArgs int) error {
 	// numArgs is then substracted from vm.sp to get the position
-	// of the calling function. minus 1 because vm.sp points to
+	// of the calling function (closure). minus 1 because vm.sp points to
 	// the slot where the next element will be pushed not the top
 	// of the stack.
 	callee := vm.stack[vm.sp-1-numArgs]
 	switch callee := callee.(type) {
-	case *object.CompiledFunction:
-		return vm.callFunction(callee, numArgs)
+	case *object.Closure:
+		return vm.callClosure(callee, numArgs)
 	case *object.Builtin:
 		return vm.callBuiltin(callee, numArgs)
 	default:
 		return fmt.Errorf("calling non-function and non-built-in")
 	}
+}
+
+func (vm *VM) pushClosure(constIndex, numFree int) error {
+	constant := vm.constants[constIndex]
+	function, ok := constant.(*object.CompiledFunction)
+	if !ok {
+		return fmt.Errorf("not a function: %+v", constant)
+	}
+
+	// take the second parameter to create a slice, free,
+	// and copy each free variable starting from the lowest
+	// on the stack to it. order is important otherwise
+	// GetFree would be referencing the wrong free variables
+	free := make([]object.Object, numFree)
+	for i := 0; i < numFree; i++ {
+		free[i] = vm.stack[vm.sp-numFree+i]
+	}
+	// clean up stack
+	vm.sp = vm.sp - numFree
+
+	closure := &object.Closure{Fn: function, Free: free}
+	return vm.push(closure)
 }
 
 func (vm *VM) currentFrame() *Frame {
