@@ -52,9 +52,17 @@ func New() *Compiler {
 		previousInstruction: EmittedInstruction{},
 	}
 
+	SymbolTable := NewSymbolTable()
+
+	// defining all the builtin functions when
+	// initializing a new compiler
+	for i, v := range object.Builtins {
+		SymbolTable.DefineBuiltin(i, v.Name)
+	}
+
 	return &Compiler{
 		constants:   []object.Object{},
-		symbolTable: NewSymbolTable(),
+		symbolTable: SymbolTable,
 		scopes:      []CompilationScope{mainScope},
 		scopeIndex:  0,
 	}
@@ -88,18 +96,17 @@ func (c *Compiler) Compile(node ast.Node) error {
 		}
 
 	// leads to a compile time error even though looks like any
-	// other map access
+	// other map access which is preferred. this checks to see
+	// an identifier was previously used as part of a let statement
+	// and if so emit an OpGetGlobal instruction with the correct operand.
+	// correct being the operand is the same as the one set by OpSetGlobal
 	case *ast.Identifier:
 		symbol, ok := c.symbolTable.Resolve(node.Value)
 		if !ok {
 			return fmt.Errorf("undefined variable %s", node.Value)
 		}
 
-		if symbol.Scope == GlobalScope {
-			c.emit(code.OpGetGlobal, symbol.Index)
-		} else {
-			c.emit(code.OpGetLocal, symbol.Index)
-		}
+		c.loadSymbol(symbol)
 
 	case *ast.LetStatement:
 		err := c.Compile(node.Value)
@@ -108,8 +115,9 @@ func (c *Compiler) Compile(node ast.Node) error {
 		}
 		// Name being the *ast.Indetifier on the left side
 		// of the let statement and Value holds the string
-		// representation of the identifier. With this an,
-		// index is created
+		// representation of the identifier. By passing it to
+		// to the Define method, this is also giving the symbol
+		// it's scope and index
 		symbol := c.symbolTable.Define(node.Name.Value)
 		if symbol.Scope == GlobalScope {
 			c.emit(code.OpSetGlobal, symbol.Index)
@@ -500,4 +508,15 @@ func NewWithState(s *SymbolTable, constants []object.Object) *Compiler {
 	compiler.symbolTable = s
 	compiler.constants = constants
 	return compiler
+}
+
+func (c *Compiler) loadSymbol(s Symbol) {
+	switch s.Scope {
+	case GlobalScope:
+		c.emit(code.OpGetGlobal, s.Index)
+	case LocalScope:
+		c.emit(code.OpGetLocal, s.Index)
+	case BuiltinScope:
+		c.emit(code.OpGetBuiltin, s.Index)
+	}
 }

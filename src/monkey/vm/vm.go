@@ -244,7 +244,8 @@ func (vm *VM) Run() error {
 			numArgs := code.ReadUint8(ins[ip+1:])
 			vm.currentFrame().ip += 1
 
-			err := vm.callFunction(int(numArgs))
+			// checks to see if user defined or built-in
+			err := vm.executeCall(int(numArgs))
 			if err != nil {
 				return err
 			}
@@ -273,6 +274,20 @@ func (vm *VM) Run() error {
 			vm.sp = frame.basePointer - 1
 
 			err := vm.push(Null)
+			if err != nil {
+				return err
+			}
+
+		// decode the operand to get the index to go into
+		// Builtins and get the definition of the built-in function
+		// to push on the stack
+		case code.OpGetBuiltin:
+			builtinIndex := code.ReadUint8(ins[ip+1:])
+			vm.currentFrame().ip += 1
+
+			definition := object.Builtins[builtinIndex]
+
+			err := vm.push(definition.Builtin)
 			if err != nil {
 				return err
 			}
@@ -521,57 +536,64 @@ func isTruthy(obj object.Object) bool {
 	}
 }
 
-func (vm *VM) callFunction(numArgs int) error {
-	fn, ok := vm.stack[vm.sp-1-numArgs].(*object.CompiledFunction)
-	if !ok {
-		return fmt.Errorf("calling non-function")
-	}
-
+func (vm *VM) callFunction(fn *object.CompiledFunction, numArgs int) error {
+	// handle the case where the wrong number of arguments are passed
+	// in. number of parameters defined in object definition
 	if numArgs != fn.NumParameters {
 		return fmt.Errorf("wrong number of arguments: want=%d, got=%d",
 			fn.NumParameters, numArgs)
 	}
 
+	// if it is a CompiledFunction, crate a new frame that
+	// contains a reference to this function and push it onto
+	// the frames stack. vm.sp serves as the base pointer for
+	// for the new frame
 	frame := NewFrame(fn, vm.sp-numArgs)
 	vm.pushFrame(frame)
 
+	// allocating space on the stack for the expected number
+	// of locals by increasing the value of vm.sp. the region
+	// will be used for local bindings and the normal usage
+	// of the function call stack won't affect it
 	vm.sp = frame.basePointer + fn.NumLocals
 
 	return nil
 }
 
-// func (vm *VM) callFunction(numArgs int) error {
-// 	// numArgs is then substracted from vm.sp to get the position
-// 	// of the calling function. minus 1 because vm.sp points to
-// 	// the slot where the next element will be pushed not the top
-// 	// of the stack.
-// 	fn, ok := vm.stack[vm.sp-1-numArgs].(*object.CompiledFunction)
-// 	if !ok {
-// 		return fmt.Errorf("calling non-function")
-// 	}
+func (vm *VM) callBuiltin(builtin *object.Builtin, numArgs int) error {
+	// just getting the args from the stack for now
+	args := vm.stack[vm.sp-numArgs : vm.sp]
 
-// 	// handle the case where the wrong number of arguments are passed
-// 	// in. number of parameters defined in object definition
-// 	if numArgs != fn.NumParameters {
-// 		return fmt.Errorf("wrong number of arguments: want=%d, got=%d",
-// 			fn.NumParameters, numArgs)
-// 	}
+	// after passing in the args decrease the pointer to
+	// take the arguments and function off the stack
+	result := builtin.Fn(args...)
+	vm.sp = vm.sp - numArgs - 1
 
-// 	// if it is a CompiledFunction, crate a new frame that
-// 	// contains a reference to this function and push it onto
-// 	// the frames stack. vm.sp serves as the base pointer for
-// 	// for the new frame
-// 	frame := NewFrame(fn, vm.sp-numArgs)
-// 	vm.pushFrame(frame)
+	// push the result onto to the stack
+	if result != nil {
+		vm.push(result)
+	} else {
+		vm.push(Null)
+	}
 
-// 	// allocating space on the stack for the expected number
-// 	// of locals by increasing the value of vm.sp. the region
-// 	// will be used for local bindings and the normal usage
-// 	// of the function call stack won't affect it
-// 	vm.sp = frame.basePointer + fn.NumLocals
+	return nil
+}
 
-// 	return nil
-// }
+func (vm *VM) executeCall(numArgs int) error {
+	// numArgs is then substracted from vm.sp to get the position
+	// of the calling function. minus 1 because vm.sp points to
+	// the slot where the next element will be pushed not the top
+	// of the stack.
+	callee := vm.stack[vm.sp-1-numArgs]
+	switch callee := callee.(type) {
+	case *object.CompiledFunction:
+		return vm.callFunction(callee, numArgs)
+	case *object.Builtin:
+		return vm.callBuiltin(callee, numArgs)
+	default:
+		return fmt.Errorf("calling non-function and non-built-in")
+	}
+}
 
 func (vm *VM) currentFrame() *Frame {
 	return vm.frames[vm.framesIndex-1]

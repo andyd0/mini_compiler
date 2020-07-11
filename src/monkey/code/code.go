@@ -45,6 +45,8 @@ const (
 	OpCall
 	OpReturn
 	OpReturnValue
+
+	OpGetBuiltin
 )
 
 // Definition - Name and length of opcode
@@ -92,6 +94,8 @@ var definitions = map[Opcode]*Definition{
 	OpCall:        {"OpCall", []int{1}},
 	OpReturn:      {"OpReturn", []int{}},
 	OpReturnValue: {"OpReturnValue", []int{}},
+
+	OpGetBuiltin: {"OpGetBuiltin", []int{1}},
 }
 
 // Lookup looks up an opcode
