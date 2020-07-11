@@ -239,21 +239,15 @@ func (vm *VM) Run() error {
 			}
 
 		case code.OpCall:
-			fn, ok := vm.stack[vm.sp-1].(*object.CompiledFunction)
-			if !ok {
-				return fmt.Errorf("calling non-function")
+			// getting OpCall operand which the number of arguments
+			// on the stack
+			numArgs := code.ReadUint8(ins[ip+1:])
+			vm.currentFrame().ip += 1
+
+			err := vm.callFunction(int(numArgs))
+			if err != nil {
+				return err
 			}
-			// if it is a CompiledFunction, crate a new frame that
-			// contains a reference to this function and push it onto
-			// the frames stack. vm.sp serves as the base pointer for
-			// for the new frame
-			frame := NewFrame(fn, vm.sp)
-			vm.pushFrame(frame)
-			// allocating space on the stack for the expected number
-			// of locals by increasing the value of vm.sp. the region
-			// will be used for local bindings and the normal usage
-			// of the function call stack won't affect it
-			vm.sp = frame.basePointer + fn.NumLocals
 
 		case code.OpReturnValue:
 			returnValue := vm.pop()
@@ -526,6 +520,58 @@ func isTruthy(obj object.Object) bool {
 		return true
 	}
 }
+
+func (vm *VM) callFunction(numArgs int) error {
+	fn, ok := vm.stack[vm.sp-1-numArgs].(*object.CompiledFunction)
+	if !ok {
+		return fmt.Errorf("calling non-function")
+	}
+
+	if numArgs != fn.NumParameters {
+		return fmt.Errorf("wrong number of arguments: want=%d, got=%d",
+			fn.NumParameters, numArgs)
+	}
+
+	frame := NewFrame(fn, vm.sp-numArgs)
+	vm.pushFrame(frame)
+
+	vm.sp = frame.basePointer + fn.NumLocals
+
+	return nil
+}
+
+// func (vm *VM) callFunction(numArgs int) error {
+// 	// numArgs is then substracted from vm.sp to get the position
+// 	// of the calling function. minus 1 because vm.sp points to
+// 	// the slot where the next element will be pushed not the top
+// 	// of the stack.
+// 	fn, ok := vm.stack[vm.sp-1-numArgs].(*object.CompiledFunction)
+// 	if !ok {
+// 		return fmt.Errorf("calling non-function")
+// 	}
+
+// 	// handle the case where the wrong number of arguments are passed
+// 	// in. number of parameters defined in object definition
+// 	if numArgs != fn.NumParameters {
+// 		return fmt.Errorf("wrong number of arguments: want=%d, got=%d",
+// 			fn.NumParameters, numArgs)
+// 	}
+
+// 	// if it is a CompiledFunction, crate a new frame that
+// 	// contains a reference to this function and push it onto
+// 	// the frames stack. vm.sp serves as the base pointer for
+// 	// for the new frame
+// 	frame := NewFrame(fn, vm.sp-numArgs)
+// 	vm.pushFrame(frame)
+
+// 	// allocating space on the stack for the expected number
+// 	// of locals by increasing the value of vm.sp. the region
+// 	// will be used for local bindings and the normal usage
+// 	// of the function call stack won't affect it
+// 	vm.sp = frame.basePointer + fn.NumLocals
+
+// 	return nil
+// }
 
 func (vm *VM) currentFrame() *Frame {
 	return vm.frames[vm.framesIndex-1]
